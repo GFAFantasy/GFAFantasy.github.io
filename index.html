@@ -284,9 +284,29 @@ async function calculatePointsPerGame() {
                     resultsDiv.innerHTML = `Lowest score: ${lowest.username} scored ${lowest.score.toFixed(2)} points in week ${lowest.week} of the ${lowest.season} season`;
                     break;
 
-                case 'matchups':
-                    // (Previous matchups code remains the same)
-                    break;
+                 const user1Id = document.getElementById('user1').value;
+                        const user2Id = document.getElementById('user2').value;
+                        const { matchups, user1Wins, user2Wins } = await getMatchupsBetweenUsers(user1Id, user2Id);
+                        const user1Name = getUsernameById(user1Id);
+                        const user2Name = getUsernameById(user2Id);
+                        results = matchups.map(m => 
+                            `<li>
+                                <details>
+                                    <summary>${m.season} Season, Week ${m.week}: ${user1Name} ${m.user1Score.toFixed(2)} - ${m.user2Score.toFixed(2)} ${user2Name}</summary>
+                                    <div class="pl-4">
+                                        <h3 class="font-semibold mt-2">${user1Name}'s Team:</h3>
+                                        ${displayPlayerScores(m.user1Players, m.user1Starters, m.user1PlayerPoints)}
+                                        <h3 class="font-semibold mt-4">${user2Name}'s Team:</h3>
+                                        ${displayPlayerScores(m.user2Players, m.user2Starters, m.user2PlayerPoints)}
+                                    </div>
+                                </details>
+                            </li>`
+                        ).join('');
+                        resultsDiv.innerHTML = matchups.length ? 
+                            `<p><strong>Head-to-head record:</strong> ${user1Name} ${user1Wins} - ${user2Wins} ${user2Name}</p>
+                            <ul>${results}</ul>` : 
+                            'No matchups found between these users.';
+                        break;
 
                 // Implement other search types here
                 default:
