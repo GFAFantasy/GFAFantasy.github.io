@@ -283,7 +283,7 @@ async function calculatePointsPerGame() {
                     const lowest = await findLowestScore();
                     resultsDiv.innerHTML = `Lowest score: ${lowest.username} scored ${lowest.score.toFixed(2)} points in week ${lowest.week} of the ${lowest.season} season`;
                     break;
-
+                case 'matchups':
                  const user1Id = document.getElementById('user1').value;
                         const user2Id = document.getElementById('user2').value;
                         const { matchups, user1Wins, user2Wins } = await getMatchupsBetweenUsers(user1Id, user2Id);
