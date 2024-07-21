@@ -26,6 +26,11 @@
                 <select id="user1" class="p-2 border rounded mr-2"></select>
                 <select id="user2" class="p-2 border rounded"></select>
             </div>
+            <div id="yearInput" class="mb-4">
+                <select id="yearSelect" class="p-2 border rounded">
+                    <option value="all">All Years</option>
+                </select>
+            </div>
             <button id="searchButton" class="bg-blue-500 text-white px-4 py-2 rounded">Search</button>
             <div id="searchResults" class="mt-4"></div>
         </div>
@@ -41,10 +46,19 @@
         const API_BASE_URL = 'https://api.sleeper.app/v1';
         let leagueUsers = [];
         let players = {};
+        let leagueHistory = [];
 
         async function fetchData(endpoint) {
             const response = await fetch(`${API_BASE_URL}${endpoint}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             return response.json();
+        }
+
+        function updateDebugInfo(message) {
+            const debugInfo = document.getElementById('debugInfo');
+            debugInfo.innerHTML += `<p>${message}</p>`;
         }
 
         async function fetchLeagueUsers() {
@@ -66,65 +80,31 @@
             players = await fetchData('/players/nfl');
         }
 
-        function updateDebugInfo(message) {
-            const debugInfo = document.getElementById('debugInfo');
-            debugInfo.innerHTML += `<p>${message}</p>`;
+        async function fetchLeagueHistory() {
+            let currentLeagueId = LEAGUE_ID;
+            let currentSeason;
+            
+            while (currentLeagueId) {
+                const leagueInfo = await fetchData(`/league/${currentLeagueId}`);
+                currentSeason = leagueInfo.season;
+                leagueHistory.unshift({ id: currentLeagueId, season: currentSeason });
+                currentLeagueId = leagueInfo.previous_league_id;
+            }
+            
+            updateYearDropdown();
+        }
+
+        function updateYearDropdown() {
+            const yearSelect = document.getElementById('yearSelect');
+            yearSelect.innerHTML = '<option value="all">All Years</option>' + 
+                leagueHistory.map(league => 
+                    `<option value="${league.season}">${league.season}</option>`
+                ).join('');
         }
 
         function getUsernameById(userId) {
             const user = leagueUsers.find(u => u.user_id === userId);
             return user ? user.display_name : 'Unknown';
-        }
-
-        async function getMatchupsBetweenUsers(user1Id, user2Id) {
-            updateDebugInfo('Fetching matchup data...');
-            let user1Wins = 0;
-            let user2Wins = 0;
-            let matchups = [];
-
-            const leagueInfo = await fetchData(`/league/${LEAGUE_ID}`);
-            let currentLeagueId = LEAGUE_ID;
-            let currentSeason = leagueInfo.season;
-
-            while (currentLeagueId) {
-                updateDebugInfo(`Processing season ${currentSeason}...`);
-                const rosters = await fetchData(`/league/${currentLeagueId}/rosters`);
-                const user1RosterId = rosters.find(r => r.owner_id === user1Id)?.roster_id;
-                const user2RosterId = rosters.find(r => r.owner_id === user2Id)?.roster_id;
-
-                if (user1RosterId && user2RosterId) {
-                    for (let week = 1; week <= 17; week++) {
-                        const weekMatchups = await fetchData(`/league/${currentLeagueId}/matchups/${week}`);
-                        const user1Matchup = weekMatchups.find(m => m.roster_id === user1RosterId);
-                        const user2Matchup = weekMatchups.find(m => m.roster_id === user2RosterId);
-
-                        if (user1Matchup && user2Matchup && user1Matchup.matchup_id === user2Matchup.matchup_id) {
-                            if (user1Matchup.points > user2Matchup.points) user1Wins++;
-                            else if (user2Matchup.points > user1Matchup.points) user2Wins++;
-
-                            matchups.push({
-                                season: currentSeason,
-                                week: week,
-                                user1Score: user1Matchup.points,
-                                user2Score: user2Matchup.points,
-                                user1Players: user1Matchup.players,
-                                user2Players: user2Matchup.players,
-                                user1Starters: user1Matchup.starters,
-                                user2Starters: user2Matchup.starters,
-                                user1PlayerPoints: user1Matchup.players_points || {},
-                                user2PlayerPoints: user2Matchup.players_points || {}
-                            });
-                        }
-                    }
-                }
-
-                const prevLeagueInfo = await fetchData(`/league/${currentLeagueId}`);
-                currentLeagueId = prevLeagueInfo.previous_league_id;
-                currentSeason = prevLeagueInfo.season;
-            }
-
-            updateDebugInfo('Matchup data fetched successfully.');
-            return { matchups, user1Wins, user2Wins };
         }
 
         function getPlayerDetails(playerId) {
@@ -137,39 +117,84 @@
                 return 'Unknown Player';
             }
         }
-        async function getTransactionsBetweenUsers(user1Id, user2Id) {
+
+        async function getMatchupsBetweenUsers(user1Id, user2Id, selectedYear) {
+            updateDebugInfo('Fetching matchup data...');
+            let user1Wins = 0;
+            let user2Wins = 0;
+            let matchups = [];
+
+            try {
+                for (const league of leagueHistory) {
+                    if (selectedYear === 'all' || league.season === selectedYear) {
+                        updateDebugInfo(`Processing season ${league.season}...`);
+                        const rosters = await fetchData(`/league/${league.id}/rosters`);
+                        const user1RosterId = rosters.find(r => r.owner_id === user1Id)?.roster_id;
+                        const user2RosterId = rosters.find(r => r.owner_id === user2Id)?.roster_id;
+
+                        if (user1RosterId && user2RosterId) {
+                            for (let week = 1; week <= 17; week++) {
+                                const weekMatchups = await fetchData(`/league/${league.id}/matchups/${week}`);
+                                const user1Matchup = weekMatchups.find(m => m.roster_id === user1RosterId);
+                                const user2Matchup = weekMatchups.find(m => m.roster_id === user2RosterId);
+
+                                if (user1Matchup && user2Matchup && user1Matchup.matchup_id === user2Matchup.matchup_id) {
+                                    if (user1Matchup.points > user2Matchup.points) user1Wins++;
+                                    else if (user2Matchup.points > user1Matchup.points) user2Wins++;
+
+                                    matchups.push({
+                                        season: league.season,
+                                        week: week,
+                                        user1Score: user1Matchup.points,
+                                        user2Score: user2Matchup.points,
+                                        user1Players: user1Matchup.players,
+                                        user2Players: user2Matchup.players,
+                                        user1Starters: user1Matchup.starters,
+                                        user2Starters: user2Matchup.starters,
+                                        user1PlayerPoints: user1Matchup.players_points || {},
+                                        user2PlayerPoints: user2Matchup.players_points || {}
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                updateDebugInfo('Matchup data fetched successfully.');
+                return { matchups, user1Wins, user2Wins };
+            } catch (error) {
+                updateDebugInfo(`Error fetching matchup data: ${error.message}`);
+                throw error;
+            }
+        }
+
+        async function getTransactionsBetweenUsers(user1Id, user2Id, selectedYear) {
             updateDebugInfo('Fetching transaction data...');
             let transactions = [];
 
             try {
-                const leagueInfo = await fetchData(`/league/${LEAGUE_ID}`);
-                let currentLeagueId = LEAGUE_ID;
-                let currentSeason = leagueInfo.season;
+                for (const league of leagueHistory) {
+                    if (selectedYear === 'all' || league.season === selectedYear) {
+                        updateDebugInfo(`Processing transactions for season ${league.season}...`);
+                        const rosters = await fetchData(`/league/${league.id}/rosters`);
+                        const user1RosterId = rosters.find(r => r.owner_id === user1Id)?.roster_id;
+                        const user2RosterId = rosters.find(r => r.owner_id === user2Id)?.roster_id;
 
-                while (currentLeagueId) {
-                    updateDebugInfo(`Processing transactions for season ${currentSeason}...`);
-                    const rosters = await fetchData(`/league/${currentLeagueId}/rosters`);
-                    const user1RosterId = rosters.find(r => r.owner_id === user1Id)?.roster_id;
-                    const user2RosterId = rosters.find(r => r.owner_id === user2Id)?.roster_id;
+                        if (user1RosterId && user2RosterId) {
+                            for (let week = 1; week <= 17; week++) {
+                                const weekTransactions = await fetchData(`/league/${league.id}/transactions/${week}`);
+                                const relevantTransactions = weekTransactions.filter(t => 
+                                    t.roster_ids.includes(user1RosterId) && t.roster_ids.includes(user2RosterId)
+                                );
 
-                    if (user1RosterId && user2RosterId) {
-                        for (let week = 1; week <= 17; week++) {
-                            const weekTransactions = await fetchData(`/league/${currentLeagueId}/transactions/${week}`);
-                            const relevantTransactions = weekTransactions.filter(t => 
-                                t.roster_ids.includes(user1RosterId) && t.roster_ids.includes(user2RosterId)
-                            );
-
-                            transactions.push(...relevantTransactions.map(t => ({
-                                ...t,
-                                season: currentSeason,
-                                week: week
-                            })));
+                                transactions.push(...relevantTransactions.map(t => ({
+                                    ...t,
+                                    season: league.season,
+                                    week: week
+                                })));
+                            }
                         }
                     }
-
-                    const prevLeagueInfo = await fetchData(`/league/${currentLeagueId}`);
-                    currentLeagueId = prevLeagueInfo.previous_league_id;
-                    currentSeason = prevLeagueInfo.season;
                 }
 
                 updateDebugInfo('Transaction data fetched successfully.');
@@ -226,138 +251,20 @@
                 <ul>${bench}</ul>
             `;
         }
-        async function findHighestScore() {
-            updateDebugInfo('Finding highest score...');
-            let highestScore = { score: 0, username: '', season: '', week: 0 };
-            const leagueInfo = await fetchData(`/league/${LEAGUE_ID}`);
-            let currentLeagueId = LEAGUE_ID;
-            let currentSeason = leagueInfo.season;
 
-            while (currentLeagueId) {
-                updateDebugInfo(`Processing season ${currentSeason}...`);
-                const rosters = await fetchData(`/league/${currentLeagueId}/rosters`);
-                
-                for (let week = 1; week <= 17; week++) {
-                    const weekMatchups = await fetchData(`/league/${currentLeagueId}/matchups/${week}`);
-                    weekMatchups.forEach(matchup => {
-                        if (matchup.points > highestScore.score) {
-                            const userId = rosters.find(r => r.roster_id === matchup.roster_id)?.owner_id;
-                            highestScore = {
-                                score: matchup.points,
-                                username: getUsernameById(userId),
-                                season: currentSeason,
-                                week: week
-                            };
-                        }
-                    });
-                }
-
-                const prevLeagueInfo = await fetchData(`/league/${currentLeagueId}`);
-                currentLeagueId = prevLeagueInfo.previous_league_id;
-                currentSeason = prevLeagueInfo.season;
-            }
-
-            updateDebugInfo('Highest score found successfully.');
-            return highestScore;
-        }
-        async function findLowestScore() {
-            updateDebugInfo('Finding lowest score...');
-            let lowestScore = { score: Infinity, username: '', season: '', week: 0 };
-            const leagueInfo = await fetchData(`/league/${LEAGUE_ID}`);
-            let currentLeagueId = LEAGUE_ID;
-            let currentSeason = leagueInfo.season;
-
-            while (currentLeagueId) {
-                updateDebugInfo(`Processing season ${currentSeason}...`);
-                const rosters = await fetchData(`/league/${currentLeagueId}/rosters`);
-                
-                for (let week = 1; week <= 17; week++) {
-                    const weekMatchups = await fetchData(`/league/${currentLeagueId}/matchups/${week}`);
-                    weekMatchups.forEach(matchup => {
-                        if (matchup.points < lowestScore.score) {
-                            const userId = rosters.find(r => r.roster_id === matchup.roster_id)?.owner_id;
-                            lowestScore = {
-                                score: matchup.points,
-                                username: getUsernameById(userId),
-                                season: currentSeason,
-                                week: week
-                            };
-                        }
-                    });
-                }
-
-                const prevLeagueInfo = await fetchData(`/league/${currentLeagueId}`);
-                currentLeagueId = prevLeagueInfo.previous_league_id;
-                currentSeason = prevLeagueInfo.season;
-            }
-
-            updateDebugInfo('Lowest score found successfully.');
-            return lowestScore;
-        }
-async function calculatePointsPerGame() {
-            updateDebugInfo('Calculating points per game...');
-            const ppg = {};
-            const leagueInfo = await fetchData(`/league/${LEAGUE_ID}`);
-            let currentLeagueId = LEAGUE_ID;
-            let currentSeason = leagueInfo.season;
-
-            while (currentLeagueId) {
-                updateDebugInfo(`Processing season ${currentSeason}...`);
-                const rosters = await fetchData(`/league/${currentLeagueId}/rosters`);
-                
-                for (let week = 1; week <= 17; week++) {
-                    const weekMatchups = await fetchData(`/league/${currentLeagueId}/matchups/${week}`);
-                    weekMatchups.forEach(matchup => {
-                        const userId = rosters.find(r => r.roster_id === matchup.roster_id)?.owner_id;
-                        if (userId) {
-                            if (!ppg[userId]) ppg[userId] = { totalPoints: 0, games: 0 };
-                            ppg[userId].totalPoints += matchup.points;
-                            ppg[userId].games++;
-                        }
-                    });
-                }
-
-                const prevLeagueInfo = await fetchData(`/league/${currentLeagueId}`);
-                currentLeagueId = prevLeagueInfo.previous_league_id;
-                currentSeason = prevLeagueInfo.season;
-            }
-
-            const result = Object.entries(ppg).map(([userId, data]) => ({
-                username: getUsernameById(userId),
-                ppg: data.games > 0 ? (data.totalPoints / data.games).toFixed(2) : 0
-            }));
-
-            updateDebugInfo('Points per game calculated successfully.');
-            return result.sort((a, b) => b.ppg - a.ppg);
-        }
-       async function performSearch() {
+        async function performSearch() {
             const searchType = document.getElementById('searchType').value;
             const resultsDiv = document.getElementById('searchResults');
+            const selectedYear = document.getElementById('yearSelect').value;
             resultsDiv.innerHTML = 'Searching...';
             let results = '';
 
-            switch (searchType) {
-                case 'ppg':
-                    const ppgResults = await calculatePointsPerGame();
-                    results = ppgResults.map(user => 
-                        `<li>${user.username}: ${user.ppg} points per game</li>`
-                    ).join('');
-                    resultsDiv.innerHTML = `<ul>${results}</ul>`;
-                    break;
-
-                case 'highScore':
-                    const highest = await findHighestScore();
-                    resultsDiv.innerHTML = `Highest score: ${highest.username} scored ${highest.score.toFixed(2)} points in week ${highest.week} of the ${highest.season} season`;
-                    break;
-
-                case 'lowScore':
-                    const lowest = await findLowestScore();
-                    resultsDiv.innerHTML = `Lowest score: ${lowest.username} scored ${lowest.score.toFixed(2)} points in week ${lowest.week} of the ${lowest.season} season`;
-                    break;
-                case 'matchups':
-                 const user1Id = document.getElementById('user1').value;
+            try {
+                switch (searchType) {
+                    case 'matchups':
+                        const user1Id = document.getElementById('user1').value;
                         const user2Id = document.getElementById('user2').value;
-                        const { matchups, user1Wins, user2Wins } = await getMatchupsBetweenUsers(user1Id, user2Id);
+                        const { matchups, user1Wins, user2Wins } = await getMatchupsBetweenUsers(user1Id, user2Id, selectedYear);
                         const user1Name = getUsernameById(user1Id);
                         const user2Name = getUsernameById(user2Id);
                         results = matchups.map(m => 
@@ -378,27 +285,29 @@ async function calculatePointsPerGame() {
                             <ul>${results}</ul>` : 
                             'No matchups found between these users.';
                         break;
+
                     case 'transactions':
-                        const user1Id = document.getElementById('user1').value;
-                        const user2Id = document.getElementById('user2').value;
-                        const transactions = await getTransactionsBetweenUsers(user1Id, user2Id);
-                        const user1Name = getUsernameById(user1Id);
-                        const user2Name = getUsernameById(user2Id);
-                        results = transactions.map(t => formatTransaction(t, user1Name, user2Name)).join('');
+                        const transUser1Id = document.getElementById('user1').value;
+                        const transUser2Id = document.getElementById('user2').value;
+                        const transactions = await getTransactionsBetweenUsers(transUser1Id, transUser2Id, selectedYear);
+                        const transUser1Name = getUsernameById(transUser1Id);
+                        const transUser2Name = getUsernameById(transUser2Id);
+                        results = transactions.map(t => formatTransaction(t, transUser1Name, transUser2Name)).join('');
                         resultsDiv.innerHTML = transactions.length ?
-                            `<h3>Transactions between ${user1Name} and ${user2Name}:</h3><ul>${results}</ul>` :
+                            `<h3>Transactions between ${transUser1Name} and ${transUser2Name}:</h3><ul>${results}</ul>` :
                             'No transactions found between these users.';
                         break;
 
-
-                // Implement other search types here
-                default:
-                    resultsDiv.innerHTML = 'Search type not implemented yet.';
+                    // Implement other search types here
+                    default:
+                        resultsDiv.innerHTML = 'Search type not implemented yet.';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `An error occurred: ${error.message}`;
             }
         }
-       
 
-        document.getElementById('searchType').addEventListener('change', function() {
+       document.getElementById('searchType').addEventListener('change', function() {
             document.getElementById('userInputs').style.display = 
                 ['matchups', 'transactions'].includes(this.value) ? 'block' : 'none';
         });
@@ -406,9 +315,15 @@ async function calculatePointsPerGame() {
         document.getElementById('searchButton').addEventListener('click', performSearch);
 
         async function initializeDashboard() {
-            await fetchLeagueUsers();
-            await fetchPlayers();
-            updateDebugInfo('Dashboard initialized. Ready for searches.');
+            try {
+                updateDebugInfo('Initializing dashboard...');
+                await fetchLeagueUsers();
+                await fetchPlayers();
+                await fetchLeagueHistory();
+                updateDebugInfo('Dashboard initialized. Ready for searches.');
+            } catch (error) {
+                updateDebugInfo(`Error initializing dashboard: ${error.message}`);
+            }
         }
 
         initializeDashboard();
