@@ -396,10 +396,7 @@ async function calculatePointsPerGame() {
                     resultsDiv.innerHTML = 'Search type not implemented yet.';
             }
         }
-        document.getElementById('searchType').addEventListener('change', function() {
-            document.getElementById('matchupInputs').style.display = 
-                this.value === 'matchups' ? 'block' : 'none';
-        });
+       
 
         document.getElementById('searchType').addEventListener('change', function() {
             document.getElementById('userInputs').style.display = 
