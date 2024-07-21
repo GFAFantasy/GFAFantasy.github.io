@@ -191,29 +191,31 @@
                 
                 return allMatchups.filter(m => 
                     m.matchup_id && m.season === league.season &&
-                    allMatchups.some(om => 
-                        om.matchup_id === m.matchup_id && om.season === league.season &&
-                        ((om.roster_id === roster1Id && m.roster_id === roster2Id) ||
-                         (om.roster_id === roster2Id && m.roster_id === roster1Id))
-                    )
+                    ((m.roster_id === roster1Id && allMatchups.some(om => om.matchup_id === m.matchup_id && om.roster_id === roster2Id)) ||
+                     (m.roster_id === roster2Id && allMatchups.some(om => om.matchup_id === m.matchup_id && om.roster_id === roster1Id)))
                 ).map(m => {
-                    const matchup1 = m.roster_id === roster1Id ? m : allMatchups.find(om => om.matchup_id === m.matchup_id && om.season === league.season && om.roster_id === roster1Id);
-                    const matchup2 = m.roster_id === roster2Id ? m : allMatchups.find(om => om.matchup_id === m.matchup_id && om.season === league.season && om.roster_id === roster2Id);
+                    const isUser1 = m.roster_id === roster1Id;
+                    const opponent = allMatchups.find(om => om.matchup_id === m.matchup_id && om.roster_id !== m.roster_id);
                     
-                    if (matchup1.points > matchup2.points) user1Wins++;
-                    else if (matchup2.points > matchup1.points) user2Wins++;
+                    if (isUser1) {
+                        if (m.points > opponent.points) user1Wins++;
+                        else if (opponent.points > m.points) user2Wins++;
+                    } else {
+                        if (m.points > opponent.points) user2Wins++;
+                        else if (opponent.points > m.points) user1Wins++;
+                    }
 
                     return {
                         season: league.season,
                         week: m.week,
-                        user1Score: matchup1.points,
-                        user2Score: matchup2.points,
-                        user1Players: matchup1.players,
-                        user2Players: matchup2.players,
-                        user1Starters: matchup1.starters,
-                        user2Starters: matchup2.starters,
-                        user1PlayerPoints: matchup1.players_points || {},
-                        user2PlayerPoints: matchup2.players_points || {}
+                        user1Score: isUser1 ? m.points : opponent.points,
+                        user2Score: isUser1 ? opponent.points : m.points,
+                        user1Players: isUser1 ? m.players : opponent.players,
+                        user2Players: isUser1 ? opponent.players : m.players,
+                        user1Starters: isUser1 ? m.starters : opponent.starters,
+                        user2Starters: isUser1 ? opponent.starters : m.starters,
+                        user1PlayerPoints: isUser1 ? m.players_points || {} : opponent.players_points || {},
+                        user2PlayerPoints: isUser1 ? opponent.players_points || {} : m.players_points || {}
                     };
                 });
             });
@@ -293,7 +295,7 @@
             }
         }
 
-        function displayPlayerScores(playerIds, starterIds, playerPoints) {
+         function displayPlayerScores(playerIds, starterIds, playerPoints) {
             const starters = starterIds.map(id => {
                 const score = playerPoints[id] || 0;
                 return `<li>${getPlayerDetails(id)}: ${score.toFixed(2)} points</li>`;
