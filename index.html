@@ -6,14 +6,14 @@
     <title>GFA Fantasy Football Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
-    <style>
+     <style>
         body {
             font-family: 'Roboto', sans-serif;
-            background-color: #1a202c;
-            color: #e2e8f0;
+            background-color: #f0f0f0;
+            color: #1a202c;
         }
         .card {
-            background-color: #2d3748;
+            background-color: #ffffff;
             border-radius: 0.5rem;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
@@ -34,57 +34,63 @@
             border-spacing: 0 0.5rem;
         }
         .results-table tr {
-            background-color: #4a5568;
+            background-color: #e6e6e6;
         }
         .results-table tr:nth-child(even) {
-            background-color: #434190;
+            background-color: #d9d9d9;
         }
         .results-table td, .results-table th {
             padding: 0.75rem;
             text-align: left;
         }
         .results-table th {
-            background-color: #2c5282;
-            color: #e2e8f0;
+            background-color: #3b82f6;
+            color: #ffffff;
             font-weight: bold;
         }
     </style>
 </head>
-<body class="p-8">
+<<body class="p-8">
     <div class="max-w-6xl mx-auto">
-        <h1 class="text-4xl font-bold mb-8 text-center text-indigo-400">GFA Fantasy Football Dashboard</h1>
+        <h1 class="text-4xl font-bold mb-8 text-center text-blue-700">GFA Fantasy Football Dashboard</h1>
         
-        <div class="card p-6 mb-8">
-            <h2 class="text-2xl font-semibold mb-4 text-indigo-300">Search League Statistics</h2>
+        <div class="card p-6 mb-8 bg-white">
+            <h2 class="text-2xl font-semibold mb-4 text-red-700">Search League Statistics</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
-                    <label for="searchType" class="block text-sm font-medium text-gray-400 mb-1">Search Type</label>
-                    <select id="searchType" class="w-full p-2 bg-gray-700 rounded text-white">
+                    <label for="searchType" class="block text-sm font-medium text-gray-700 mb-1">Search Type</label>
+                    <select id="searchType" class="w-full p-2 bg-gray-100 rounded text-gray-800 border border-gray-300">
                         <option value="ppg">Points Per Game</option>
                         <option value="record">Get Record</option>
                         <option value="matchups">Matchups Between Users</option>
+                        <option value="userMatchups">Matchups for User</option>
                         <option value="trades">Trades Between Users</option>
+
                     </select>
                 </div>
                 <div id="userInputs" class="hidden">
-                    <label for="user1" class="block text-sm font-medium text-gray-400 mb-1">User 1</label>
-                    <select id="user1" class="w-full p-2 bg-gray-700 rounded text-white mb-2"></select>
-                    <label for="user2" class="block text-sm font-medium text-gray-400 mb-1">User 2</label>
-                    <select id="user2" class="w-full p-2 bg-gray-700 rounded text-white"></select>
+                    <label for="user1" class="block text-sm font-medium text-gray-700 mb-1">User 1</label>
+                    <select id="user1" class="w-full p-2 bg-gray-100 rounded text-gray-800 border border-gray-300 mb-2"></select>
+                    <label for="user2" class="block text-sm font-medium text-gray-700 mb-1">User 2</label>
+                    <select id="user2" class="w-full p-2 bg-gray-100 rounded text-gray-800 border border-gray-300"></select>
+                </div>
+                <div id="singleUserInput" class="hidden">
+                    <label for="user" class="block text-sm font-medium text-gray-700 mb-1">User</label>
+                    <select id="user" class="w-full p-2 bg-gray-100 rounded text-gray-800 border border-gray-300"></select>
                 </div>
                 <div>
-                    <label for="yearSelect" class="block text-sm font-medium text-gray-400 mb-1">Year</label>
-                    <select id="yearSelect" class="w-full p-2 bg-gray-700 rounded text-white">
+                    <label for="yearSelect" class="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                    <select id="yearSelect" class="w-full p-2 bg-gray-100 rounded text-gray-800 border border-gray-300">
                         <option value="all">All Years</option>
                     </select>
                 </div>
             </div>
-            <button id="searchButton" class="btn bg-indigo-600 text-white px-6 py-2 rounded font-semibold">Search</button>
+            <button id="searchButton" class="btn bg-blue-600 text-white px-6 py-2 rounded font-semibold">Search</button>
             <div id="searchResults" class="mt-6"></div>
         </div>
 
-        <div class="card p-6">
-            <h2 class="text-2xl font-semibold mb-4 text-indigo-300">Debug Information</h2>
+        <div class="card p-6 bg-white">
+            <h2 class="text-2xl font-semibold mb-4 text-red-700">Debug Information</h2>
             <div id="debugInfo" class="text-sm"></div>
         </div>
     </div>
@@ -115,7 +121,7 @@
         }
 
         function updateUserDropdowns() {
-            const userDropdowns = ['user1', 'user2'];
+            const userDropdowns = ['user1', 'user2', 'user'];
             userDropdowns.forEach(dropdownId => {
                 const dropdown = document.getElementById(dropdownId);
                 dropdown.innerHTML = leagueUsers.map(user => 
@@ -148,6 +154,57 @@
                 leagueHistory.map(league => 
                     `<option value="${league.season}">${league.season}</option>`
                 ).join('');
+        }
+
+        async function getUserMatchups(userId, selectedYear) {
+            updateDebugInfo('Fetching user matchup data...');
+            let matchups = [];
+
+            try {
+                for (const league of leagueHistory) {
+                    if (selectedYear === 'all' || league.season === selectedYear) {
+                        updateDebugInfo(`Processing season ${league.season}...`);
+                        const rosters = await fetchData(`/league/${league.id}/rosters`);
+                        const userRosterId = rosters.find(r => r.owner_id === userId)?.roster_id;
+
+                        if (userRosterId) {
+                            for (let week = 1; week <= 17; week++) {
+                                const weekMatchups = await fetchData(`/league/${league.id}/matchups/${week}`);
+                                const userMatchup = weekMatchups.find(m => m.roster_id === userRosterId);
+
+                                if (userMatchup) {
+                                    const opponentMatchup = weekMatchups.find(m => 
+                                        m.matchup_id === userMatchup.matchup_id && m.roster_id !== userRosterId
+                                    );
+
+                                    if (opponentMatchup) {
+                                        const opponentId = rosters.find(r => r.roster_id === opponentMatchup.roster_id)?.owner_id;
+                                        matchups.push({
+                                            season: league.season,
+                                            week: week,
+                                            userScore: userMatchup.points,
+                                            opponentScore: opponentMatchup.points,
+                                            opponentId: opponentId,
+                                            userStarters: userMatchup.starters,
+                                            userPlayers: userMatchup.players,
+                                            userPlayerPoints: userMatchup.players_points || {},
+                                            opponentStarters: opponentMatchup.starters,
+                                            opponentPlayers: opponentMatchup.players,
+                                            opponentPlayerPoints: opponentMatchup.players_points || {}
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                updateDebugInfo('User matchup data fetched successfully.');
+                return matchups;
+            } catch (error) {
+                updateDebugInfo(`Error fetching user matchup data: ${error.message}`);
+                throw error;
+            }
         }
 
         function getUsernameById(userId) {
@@ -482,6 +539,34 @@
                             </table>
                         `;
                         break;
+                         case 'userMatchups':
+                        const userId = document.getElementById('user').value;
+                        const userMatchups = await getUserMatchups(userId, selectedYear);
+                        const userName = getUsernameById(userId);
+                        results = `
+                            <h3 class="text-xl font-semibold mb-4">Matchups for ${userName}</h3>
+                            ${userMatchups.map((m, index) => `
+                                <div class="mb-2 p-4 bg-gray-100 rounded">
+                                    <div class="flex justify-between items-center cursor-pointer" onclick="toggleMatchupDetails(${index})">
+                                        <span>${m.season} Season, Week ${m.week}: ${userName} ${m.userScore.toFixed(2)} - ${m.opponentScore.toFixed(2)} ${getUsernameById(m.opponentId)}</span>
+                                        <span class="text-xl" id="arrow-${index}">▼</span>
+                                    </div>
+                                    <div class="matchup-details hidden mt-4" id="matchup-${index}">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <h5 class="font-semibold mb-2">${userName}'s Roster:</h5>
+                                                ${formatRoster(m.userStarters, m.userPlayers, m.userPlayerPoints)}
+                                            </div>
+                                            <div>
+                                                <h5 class="font-semibold mb-2">${getUsernameById(m.opponentId)}'s Roster:</h5>
+                                                ${formatRoster(m.opponentStarters, m.opponentPlayers, m.opponentPlayerPoints)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        `;
+                        break;
                           case 'matchups':
                     const user1Id = document.getElementById('user1').value;
                     const user2Id = document.getElementById('user2').value;
@@ -555,12 +640,13 @@
 
         document.getElementById('searchButton').addEventListener('click', performSearch);
 
-        async function initializeDashboard() {
+       async function initializeDashboard() {
             try {
                 updateDebugInfo('Initializing dashboard...');
                 await fetchLeagueUsers();
                 await fetchPlayers();
                 await fetchLeagueHistory();
+                updateUserDropdowns();
                 updateDebugInfo('Dashboard initialized. Ready for searches.');
             } catch (error) {
                 updateDebugInfo(`Error initializing dashboard: ${error.message}`);
