@@ -17,7 +17,7 @@
                 <option value="highScore">Highest Score Ever</option>
                 <option value="lowScore">Lowest Score Ever</option>
                 <option value="matchups">Matchups Between Users</option>
-                <option value="transactions">Transactions Between Users</option>
+                <option value="trades">Trades Between Users</option>
                 <option value="winPercentage">Win Percentage</option>
                 <option value="longestWinStreak">Longest Win Streak</option>
                 <option value="highestScoringWeek">Highest Scoring Week</option>
@@ -168,14 +168,14 @@
             }
         }
 
-        async function getTransactionsBetweenUsers(user1Id, user2Id, selectedYear) {
-            updateDebugInfo('Fetching transaction data...');
-            let transactions = [];
+        async function getTradesBetweenUsers(user1Id, user2Id, selectedYear) {
+            updateDebugInfo('Fetching trade data...');
+            let trades = [];
 
             try {
                 for (const league of leagueHistory) {
                     if (selectedYear === 'all' || league.season === selectedYear) {
-                        updateDebugInfo(`Processing transactions for season ${league.season}...`);
+                        updateDebugInfo(`Processing trades for season ${league.season}...`);
                         const rosters = await fetchData(`/league/${league.id}/rosters`);
                         const user1RosterId = rosters.find(r => r.owner_id === user1Id)?.roster_id;
                         const user2RosterId = rosters.find(r => r.owner_id === user2Id)?.roster_id;
@@ -183,52 +183,60 @@
                         if (user1RosterId && user2RosterId) {
                             for (let week = 1; week <= 17; week++) {
                                 const weekTransactions = await fetchData(`/league/${league.id}/transactions/${week}`);
-                                const relevantTransactions = weekTransactions.filter(t => 
-                                    t.roster_ids.includes(user1RosterId) && t.roster_ids.includes(user2RosterId)
+                                const relevantTrades = weekTransactions.filter(t => 
+                                    t.type === 'trade' &&
+                                    t.roster_ids.includes(user1RosterId) &&
+                                    t.roster_ids.includes(user2RosterId)
                                 );
 
-                                transactions.push(...relevantTransactions.map(t => ({
+                                trades.push(...relevantTrades.map(t => ({
                                     ...t,
                                     season: league.season,
-                                    week: week
+                                    week: week,
+                                    user1RosterId,
+                                    user2RosterId
                                 })));
                             }
                         }
                     }
                 }
 
-                updateDebugInfo('Transaction data fetched successfully.');
-                return transactions;
+                updateDebugInfo('Trade data fetched successfully.');
+                return trades;
             } catch (error) {
-                updateDebugInfo(`Error fetching transaction data: ${error.message}`);
+                updateDebugInfo(`Error fetching trade data: ${error.message}`);
                 throw error;
             }
         }
 
-        function formatTransaction(transaction, user1Name, user2Name) {
-            let details = '';
-            if (transaction.type === 'trade') {
-                const adds1 = Object.keys(transaction.adds || {}).filter(playerId => transaction.adds[playerId] === transaction.roster_ids[0]);
-                const adds2 = Object.keys(transaction.adds || {}).filter(playerId => transaction.adds[playerId] === transaction.roster_ids[1]);
-                const drops1 = Object.keys(transaction.drops || {}).filter(playerId => transaction.drops[playerId] === transaction.roster_ids[0]);
-                const drops2 = Object.keys(transaction.drops || {}).filter(playerId => transaction.drops[playerId] === transaction.roster_ids[1]);
-
-                details += `${user1Name} received: ${adds1.map(id => getPlayerDetails(id)).join(', ')}<br>`;
-                details += `${user2Name} received: ${adds2.map(id => getPlayerDetails(id)).join(', ')}<br>`;
-                
-                if (transaction.draft_picks && transaction.draft_picks.length > 0) {
-                    details += 'Draft picks traded:<br>';
-                    transaction.draft_picks.forEach(pick => {
-                        const receiver = pick.owner_id === transaction.roster_ids[0] ? user1Name : user2Name;
-                        details += `${receiver} received: Round ${pick.round} pick (${pick.season} season)<br>`;
-                    });
+        function formatTrade(trade, user1Name, user2Name) {
+            const user1Received = [];
+            const user2Received = [];
+            
+            // Process players
+            Object.entries(trade.adds || {}).forEach(([playerId, rosterId]) => {
+                if (rosterId === trade.user1RosterId) {
+                    user1Received.push(getPlayerDetails(playerId));
+                } else if (rosterId === trade.user2RosterId) {
+                    user2Received.push(getPlayerDetails(playerId));
                 }
-            }
+            });
+
+            // Process draft picks
+            (trade.draft_picks || []).forEach(pick => {
+                const pickDescription = `${pick.season} Round ${pick.round} pick`;
+                if (pick.owner_id === trade.user1RosterId) {
+                    user1Received.push(pickDescription);
+                } else if (pick.owner_id === trade.user2RosterId) {
+                    user2Received.push(pickDescription);
+                }
+            });
+
             return `
-                <li>
-                    <strong>${transaction.season} Season, Week ${transaction.week}</strong><br>
-                    Type: ${transaction.type}<br>
-                    ${details}
+                <li class="mb-4 p-4 bg-gray-50 rounded">
+                    <strong>${trade.season} Season, Week ${trade.week}</strong><br>
+                    ${user1Name} received: ${user1Received.join(', ') || 'Nothing'}<br>
+                    ${user2Name} received: ${user2Received.join(', ') || 'Nothing'}
                 </li>
             `;
         }
@@ -286,16 +294,16 @@
                             'No matchups found between these users.';
                         break;
 
-                    case 'transactions':
-                        const transUser1Id = document.getElementById('user1').value;
-                        const transUser2Id = document.getElementById('user2').value;
-                        const transactions = await getTransactionsBetweenUsers(transUser1Id, transUser2Id, selectedYear);
-                        const transUser1Name = getUsernameById(transUser1Id);
-                        const transUser2Name = getUsernameById(transUser2Id);
-                        results = transactions.map(t => formatTransaction(t, transUser1Name, transUser2Name)).join('');
-                        resultsDiv.innerHTML = transactions.length ?
-                            `<h3>Transactions between ${transUser1Name} and ${transUser2Name}:</h3><ul>${results}</ul>` :
-                            'No transactions found between these users.';
+                    case 'trades':
+                        const tradeUser1Id = document.getElementById('user1').value;
+                        const tradeUser2Id = document.getElementById('user2').value;
+                        const trades = await getTradesBetweenUsers(tradeUser1Id, tradeUser2Id, selectedYear);
+                        const tradeUser1Name = getUsernameById(tradeUser1Id);
+                        const tradeUser2Name = getUsernameById(tradeUser2Id);
+                        results = trades.map(t => formatTrade(t, tradeUser1Name, tradeUser2Name)).join('');
+                        resultsDiv.innerHTML = trades.length ?
+                            `<h3>Trades between ${tradeUser1Name} and ${tradeUser2Name}:</h3><ul>${results}</ul>` :
+                            'No trades found between these users.';
                         break;
 
                     // Implement other search types here
@@ -307,9 +315,9 @@
             }
         }
 
-       document.getElementById('searchType').addEventListener('change', function() {
+        document.getElementById('searchType').addEventListener('change', function() {
             document.getElementById('userInputs').style.display = 
-                ['matchups', 'transactions'].includes(this.value) ? 'block' : 'none';
+                ['matchups', 'trades'].includes(this.value) ? 'block' : 'none';
         });
 
         document.getElementById('searchButton').addEventListener('click', performSearch);
