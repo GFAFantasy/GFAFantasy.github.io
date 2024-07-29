@@ -269,6 +269,16 @@
 
             try {
                 switch (searchType) {
+                         case 'ppg':
+                        const ppgResults = await getPointsPerGame(selectedYear);
+                        results = ppgResults.map(user => 
+                            `<li class="mb-2">
+                                ${user.username}: ${user.ppg.toFixed(2)} points per game
+                                (${user.gamesPlayed} games over ${user.seasons} season${user.seasons > 1 ? 's' : ''})
+                            </li>`
+                        ).join('');
+                        resultsDiv.innerHTML = `<ul class="list-disc pl-5">${results}</ul>`;
+                        break;
                     case 'matchups':
                         const user1Id = document.getElementById('user1').value;
                         const user2Id = document.getElementById('user2').value;
@@ -312,6 +322,48 @@
                 }
             } catch (error) {
                 resultsDiv.innerHTML = `An error occurred: ${error.message}`;
+            }
+        }
+
+          async function getPointsPerGame(selectedYear) {
+            updateDebugInfo('Calculating points per game...');
+            const ppgData = {};
+
+            try {
+                for (const league of leagueHistory) {
+                    if (selectedYear === 'all' || league.season === selectedYear) {
+                        updateDebugInfo(`Processing season ${league.season}...`);
+                        const rosters = await fetchData(`/league/${league.id}/rosters`);
+                        
+                        for (let week = 1; week <= 17; week++) {
+                            const weekMatchups = await fetchData(`/league/${league.id}/matchups/${week}`);
+                            weekMatchups.forEach(matchup => {
+                                const userId = rosters.find(r => r.roster_id === matchup.roster_id)?.owner_id;
+                                if (userId) {
+                                    if (!ppgData[userId]) {
+                                        ppgData[userId] = { totalPoints: 0, gamesPlayed: 0, seasons: new Set() };
+                                    }
+                                    ppgData[userId].totalPoints += matchup.points;
+                                    ppgData[userId].gamesPlayed++;
+                                    ppgData[userId].seasons.add(league.season);
+                                }
+                            });
+                        }
+                    }
+                }
+
+                const results = Object.entries(ppgData).map(([userId, data]) => ({
+                    username: getUsernameById(userId),
+                    ppg: data.totalPoints / data.gamesPlayed,
+                    gamesPlayed: data.gamesPlayed,
+                    seasons: data.seasons.size
+                }));
+
+                updateDebugInfo('Points per game calculated successfully.');
+                return results.sort((a, b) => b.ppg - a.ppg);
+            } catch (error) {
+                updateDebugInfo(`Error calculating points per game: ${error.message}`);
+                throw error;
             }
         }
 
