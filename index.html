@@ -278,16 +278,118 @@
         }
 
         async function getMatchupsBetweenUsers(user1Id, user2Id, selectedYear) {
-            // (Implementation remains the same)
+        updateDebugInfo('Fetching matchup data...');
+        let user1Wins = 0;
+        let user2Wins = 0;
+        let matchups = [];
+
+        try {
+            for (const league of leagueHistory) {
+                if (selectedYear === 'all' || league.season === selectedYear) {
+                    updateDebugInfo(`Processing season ${league.season}...`);
+                    const rosters = await fetchData(`/league/${league.id}/rosters`);
+                    const user1RosterId = rosters.find(r => r.owner_id === user1Id)?.roster_id;
+                    const user2RosterId = rosters.find(r => r.owner_id === user2Id)?.roster_id;
+
+                    if (user1RosterId && user2RosterId) {
+                        for (let week = 1; week <= 17; week++) {
+                            const weekMatchups = await fetchData(`/league/${league.id}/matchups/${week}`);
+                            const user1Matchup = weekMatchups.find(m => m.roster_id === user1RosterId);
+                            const user2Matchup = weekMatchups.find(m => m.roster_id === user2RosterId);
+
+                            if (user1Matchup && user2Matchup && user1Matchup.matchup_id === user2Matchup.matchup_id) {
+                                if (user1Matchup.points > user2Matchup.points) user1Wins++;
+                                else if (user2Matchup.points > user1Matchup.points) user2Wins++;
+
+                                matchups.push({
+                                    season: league.season,
+                                    week: week,
+                                    user1Score: user1Matchup.points,
+                                    user2Score: user2Matchup.points
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            updateDebugInfo('Matchup data fetched successfully.');
+            return { matchups, user1Wins, user2Wins };
+        } catch (error) {
+            updateDebugInfo(`Error fetching matchup data: ${error.message}`);
+            throw error;
         }
+    }
 
         async function getTradesBetweenUsers(user1Id, user2Id, selectedYear) {
-            // (Implementation remains the same)
-        }
+        updateDebugInfo('Fetching trade data...');
+        let trades = [];
 
-        function formatTradeDetails(trade, user1Name, user2Name) {
-            // (Implementation remains the same)
+        try {
+            for (const league of leagueHistory) {
+                if (selectedYear === 'all' || league.season === selectedYear) {
+                    updateDebugInfo(`Processing trades for season ${league.season}...`);
+                    const rosters = await fetchData(`/league/${league.id}/rosters`);
+                    const user1RosterId = rosters.find(r => r.owner_id === user1Id)?.roster_id;
+                    const user2RosterId = rosters.find(r => r.owner_id === user2Id)?.roster_id;
+
+                    if (user1RosterId && user2RosterId) {
+                        for (let week = 1; week <= 17; week++) {
+                            const weekTransactions = await fetchData(`/league/${league.id}/transactions/${week}`);
+                            const relevantTrades = weekTransactions.filter(t => 
+                                t.type === 'trade' &&
+                                t.roster_ids.includes(user1RosterId) &&
+                                t.roster_ids.includes(user2RosterId)
+                            );
+
+                            trades.push(...relevantTrades.map(t => ({
+                                ...t,
+                                season: league.season,
+                                week: week,
+                                user1RosterId,
+                                user2RosterId
+                            })));
+                        }
+                    }
+                }
+            }
+
+            updateDebugInfo('Trade data fetched successfully.');
+            return trades;
+        } catch (error) {
+            updateDebugInfo(`Error fetching trade data: ${error.message}`);
+            throw error;
         }
+    }
+
+         function formatTradeDetails(trade, user1Name, user2Name) {
+        const user1Received = [];
+        const user2Received = [];
+        
+        // Process players
+        Object.entries(trade.adds || {}).forEach(([playerId, rosterId]) => {
+            if (rosterId === trade.user1RosterId) {
+                user1Received.push(getPlayerDetails(playerId));
+            } else if (rosterId === trade.user2RosterId) {
+                user2Received.push(getPlayerDetails(playerId));
+            }
+        });
+
+        // Process draft picks
+        (trade.draft_picks || []).forEach(pick => {
+            const pickDescription = `${pick.season} Round ${pick.round} pick`;
+            if (pick.owner_id === trade.user1RosterId) {
+                user1Received.push(pickDescription);
+            } else if (pick.owner_id === trade.user2RosterId) {
+                user2Received.push(pickDescription);
+            }
+        });
+
+        return `
+            <p>${user1Name} received: ${user1Received.join(', ') || 'Nothing'}</p>
+            <p>${user2Name} received: ${user2Received.join(', ') || 'Nothing'}</p>
+        `;
+    }
 
         async function performSearch() {
             const searchType = document.getElementById('searchType').value;
@@ -348,42 +450,49 @@
                         `;
                         break;
                         case 'matchups':
-                        const user1Id = document.getElementById('user1').value;
-                        const user2Id = document.getElementById('user2').value;
-                        const { matchups, user1Wins, user2Wins } = await getMatchupsBetweenUsers(user1Id, user2Id, selectedYear);
-                        const user1Name = getUsernameById(user1Id);
-                        const user2Name = getUsernameById(user2Id);
-                        results = `
-                            <h3 class="text-xl font-semibold mb-4">Head-to-head record: ${user1Name} ${user1Wins} - ${user2Wins} ${user2Name}</h3>
-                            <table class="results-table w-full">
-                                <thead>
+                    const user1Id = document.getElementById('user1').value;
+                    const user2Id = document.getElementById('user2').value;
+                    const matchupsData = await getMatchupsBetweenUsers(user1Id, user2Id, selectedYear);
+                    if (!matchupsData || !matchupsData.matchups) {
+                        throw new Error('No matchup data found');
+                    }
+                    const { matchups, user1Wins, user2Wins } = matchupsData;
+                    const user1Name = getUsernameById(user1Id);
+                    const user2Name = getUsernameById(user2Id);
+                    results = `
+                        <h3 class="text-xl font-semibold mb-4">Head-to-head record: ${user1Name} ${user1Wins} - ${user2Wins} ${user2Name}</h3>
+                        <table class="results-table w-full">
+                            <thead>
+                                <tr>
+                                    <th>Season</th>
+                                    <th>Week</th>
+                                    <th>${user1Name}</th>
+                                    <th>${user2Name}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${matchups.map(m => `
                                     <tr>
-                                        <th>Season</th>
-                                        <th>Week</th>
-                                        <th>${user1Name}</th>
-                                        <th>${user2Name}</th>
+                                        <td>${m.season}</td>
+                                        <td>${m.week}</td>
+                                        <td>${m.user1Score.toFixed(2)}</td>
+                                        <td>${m.user2Score.toFixed(2)}</td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    ${matchups.map(m => `
-                                        <tr>
-                                            <td>${m.season}</td>
-                                            <td>${m.week}</td>
-                                            <td>${m.user1Score.toFixed(2)}</td>
-                                            <td>${m.user2Score.toFixed(2)}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        `;
-                        break;
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                    break;
 
-                    case 'trades':
-                        const tradeUser1Id = document.getElementById('user1').value;
-                        const tradeUser2Id = document.getElementById('user2').value;
-                        const trades = await getTradesBetweenUsers(tradeUser1Id, tradeUser2Id, selectedYear);
-                        const tradeUser1Name = getUsernameById(tradeUser1Id);
-                        const tradeUser2Name = getUsernameById(tradeUser2Id);
+                       case 'trades':
+                    const tradeUser1Id = document.getElementById('user1').value;
+                    const tradeUser2Id = document.getElementById('user2').value;
+                    const trades = await getTradesBetweenUsers(tradeUser1Id, tradeUser2Id, selectedYear);
+                    const tradeUser1Name = getUsernameById(tradeUser1Id);
+                    const tradeUser2Name = getUsernameById(tradeUser2Id);
+                    if (trades.length === 0) {
+                        results = `<p class="text-center">No trades found between ${tradeUser1Name} and ${tradeUser2Name}</p>`;
+                    } else {
                         results = `
                             <h3 class="text-xl font-semibold mb-4">Trades between ${tradeUser1Name} and ${tradeUser2Name}</h3>
                             ${trades.map(trade => `
@@ -393,7 +502,8 @@
                                 </div>
                             `).join('')}
                         `;
-                        break;
+                    }
+                    break;
 
                     // Placeholder for other search types
                     default:
@@ -402,6 +512,7 @@
                 resultsDiv.innerHTML = results;
             } catch (error) {
                 resultsDiv.innerHTML = `<p class="text-center text-red-500">An error occurred: ${error.message}</p>`;
+            updateDebugInfo(`Search error: ${error.message}`);
             }
         }
 
