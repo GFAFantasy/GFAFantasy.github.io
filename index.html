@@ -62,13 +62,8 @@
                     <select id="searchType" class="w-full p-2 bg-gray-700 rounded text-white">
                         <option value="ppg">Points Per Game</option>
                         <option value="record">Get Record</option>
-                        <option value="highScore">Highest Score Ever</option>
-                        <option value="lowScore">Lowest Score Ever</option>
                         <option value="matchups">Matchups Between Users</option>
                         <option value="trades">Trades Between Users</option>
-                        <option value="winPercentage">Win Percentage</option>
-                        <option value="longestWinStreak">Longest Win Streak</option>
-                        <option value="highestScoringWeek">Highest Scoring Week</option>
                     </select>
                 </div>
                 <div id="userInputs" class="hidden">
@@ -170,7 +165,17 @@
                 return 'Unknown Player';
             }
         }
-
+ function toggleMatchupDetails(index) {
+        const detailsElement = document.getElementById(`matchup-${index}`);
+        const arrowElement = document.getElementById(`arrow-${index}`);
+        if (detailsElement.classList.contains('hidden')) {
+            detailsElement.classList.remove('hidden');
+            arrowElement.textContent = '▲';
+        } else {
+            detailsElement.classList.add('hidden');
+            arrowElement.textContent = '▼';
+        }
+    }
         async function getPointsPerGame(selectedYear) {
             updateDebugInfo('Calculating points per game...');
             const ppgData = {};
@@ -489,17 +494,22 @@
                     const user2Name = getUsernameById(user2Id);
                     results = `
                         <h3 class="text-xl font-semibold mb-4">Head-to-head record: ${user1Name} ${user1Wins} - ${user2Wins} ${user2Name}</h3>
-                        ${matchups.map(m => `
-                            <div class="mb-6 p-4 bg-gray-700 rounded">
-                                <h4 class="font-semibold mb-2">${m.season} Season, Week ${m.week}: ${user1Name} ${m.user1Score.toFixed(2)} - ${m.user2Score.toFixed(2)} ${user2Name}</h4>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <h5 class="font-semibold mb-2">${user1Name}'s Roster:</h5>
-                                        ${formatRoster(m.user1Starters, m.user1Players, m.user1PlayerPoints)}
-                                    </div>
-                                    <div>
-                                        <h5 class="font-semibold mb-2">${user2Name}'s Roster:</h5>
-                                        ${formatRoster(m.user2Starters, m.user2Players, m.user2PlayerPoints)}
+                        ${matchups.map((m, index) => `
+                            <div class="mb-2 p-4 bg-gray-700 rounded">
+                                <div class="flex justify-between items-center cursor-pointer" onclick="toggleMatchupDetails(${index})">
+                                    <span>${m.season} Season, Week ${m.week}: ${user1Name} ${m.user1Score.toFixed(2)} - ${m.user2Score.toFixed(2)} ${user2Name}</span>
+                                    <span class="text-xl" id="arrow-${index}">▼</span>
+                                </div>
+                                <div class="matchup-details hidden mt-4" id="matchup-${index}">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <h5 class="font-semibold mb-2">${user1Name}'s Roster:</h5>
+                                            ${formatRoster(m.user1Starters, m.user1Players, m.user1PlayerPoints)}
+                                        </div>
+                                        <div>
+                                            <h5 class="font-semibold mb-2">${user2Name}'s Roster:</h5>
+                                            ${formatRoster(m.user2Starters, m.user2Players, m.user2PlayerPoints)}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
