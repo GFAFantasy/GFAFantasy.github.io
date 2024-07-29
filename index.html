@@ -65,6 +65,7 @@
                         <option value="matchups">Matchups Between Users</option>
                         <option value="userMatchups">Matchups for User</option>
                         <option value="trades">Trades Between Users</option>
+                        <option value="winner2425">Winner of 24-25 Season</option>
 
                     </select>
                 </div>
@@ -621,6 +622,19 @@
                         `;
                     }
                     break;
+                        case 'winner2425':
+                        results = `
+                            <h3 class="text-xl font-semibold mb-4">Winner of 24-25 Season</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <img src="https://yt3.googleusercontent.com/ytc/AIdro_le8sCLAGgNuekIZtCOyrgETXTGe_ORciex8l7oEX4wA44=s900-c-k-c0x00ffffff-no-rj" alt="Winner Image 1" class="w-full h-auto">
+                                </div>
+                                <div>
+                                    <img src="https://encrypted-tbn1.gstatic.com/licensed-image?q=tbn:ANd9GcQyFhvn4pJEnK0U9ZP-IybZ-FvL8WBx8aMYEF6ODgAM2jypmTfDoIWv7SbsIM7oXmTAYDZqZp9UaUze1so" alt="Winner Image 2" class="w-full h-auto">
+                                </div>
+                            </div>
+                        `;
+                        break;
 
                     // Placeholder for other search types
                     default:
