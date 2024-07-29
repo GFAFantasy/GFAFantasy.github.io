@@ -305,7 +305,13 @@
                                     season: league.season,
                                     week: week,
                                     user1Score: user1Matchup.points,
-                                    user2Score: user2Matchup.points
+                                    user2Score: user2Matchup.points,
+                                    user1Starters: user1Matchup.starters,
+                                    user2Starters: user2Matchup.starters,
+                                    user1Players: user1Matchup.players,
+                                    user2Players: user2Matchup.players,
+                                    user1PlayerPoints: user1Matchup.players_points || {},
+                                    user2PlayerPoints: user2Matchup.players_points || {}
                                 });
                             }
                         }
@@ -360,6 +366,28 @@
             updateDebugInfo(`Error fetching trade data: ${error.message}`);
             throw error;
         }
+    }
+        function formatRoster(starters, players, playerPoints) {
+        const startersList = starters.map(playerId => {
+            const playerName = getPlayerDetails(playerId);
+            const points = playerPoints[playerId] ? playerPoints[playerId].toFixed(2) : '0.00';
+            return `<li>${playerName}: ${points} pts</li>`;
+        }).join('');
+
+        const benchList = players.filter(playerId => !starters.includes(playerId)).map(playerId => {
+            const playerName = getPlayerDetails(playerId);
+            const points = playerPoints[playerId] ? playerPoints[playerId].toFixed(2) : '0.00';
+            return `<li>${playerName}: ${points} pts</li>`;
+        }).join('');
+
+        return `
+            <div class="roster">
+                <h4 class="font-semibold">Starters:</h4>
+                <ul class="list-disc pl-5 mb-2">${startersList}</ul>
+                <h4 class="font-semibold">Bench:</h4>
+                <ul class="list-disc pl-5">${benchList}</ul>
+            </div>
+        `;
     }
 
          function formatTradeDetails(trade, user1Name, user2Name) {
@@ -449,7 +477,7 @@
                             </table>
                         `;
                         break;
-                        case 'matchups':
+                          case 'matchups':
                     const user1Id = document.getElementById('user1').value;
                     const user2Id = document.getElementById('user2').value;
                     const matchupsData = await getMatchupsBetweenUsers(user1Id, user2Id, selectedYear);
@@ -461,29 +489,23 @@
                     const user2Name = getUsernameById(user2Id);
                     results = `
                         <h3 class="text-xl font-semibold mb-4">Head-to-head record: ${user1Name} ${user1Wins} - ${user2Wins} ${user2Name}</h3>
-                        <table class="results-table w-full">
-                            <thead>
-                                <tr>
-                                    <th>Season</th>
-                                    <th>Week</th>
-                                    <th>${user1Name}</th>
-                                    <th>${user2Name}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${matchups.map(m => `
-                                    <tr>
-                                        <td>${m.season}</td>
-                                        <td>${m.week}</td>
-                                        <td>${m.user1Score.toFixed(2)}</td>
-                                        <td>${m.user2Score.toFixed(2)}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                        ${matchups.map(m => `
+                            <div class="mb-6 p-4 bg-gray-700 rounded">
+                                <h4 class="font-semibold mb-2">${m.season} Season, Week ${m.week}: ${user1Name} ${m.user1Score.toFixed(2)} - ${m.user2Score.toFixed(2)} ${user2Name}</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <h5 class="font-semibold mb-2">${user1Name}'s Roster:</h5>
+                                        ${formatRoster(m.user1Starters, m.user1Players, m.user1PlayerPoints)}
+                                    </div>
+                                    <div>
+                                        <h5 class="font-semibold mb-2">${user2Name}'s Roster:</h5>
+                                        ${formatRoster(m.user2Starters, m.user2Players, m.user2PlayerPoints)}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
                     `;
                     break;
-
                        case 'trades':
                     const tradeUser1Id = document.getElementById('user1').value;
                     const tradeUser2Id = document.getElementById('user2').value;
