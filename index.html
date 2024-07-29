@@ -636,6 +636,8 @@
         document.getElementById('searchType').addEventListener('change', function() {
             document.getElementById('userInputs').style.display = 
                 ['matchups', 'trades'].includes(this.value) ? 'block' : 'none';
+            document.getElementById('singleUserInput').style.display = 
+                this.value === 'userMatchups' ? 'block' : 'none';
         });
 
         document.getElementById('searchButton').addEventListener('click', performSearch);
