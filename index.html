@@ -14,13 +14,10 @@
             <h2 class="text-xl font-semibold mb-4">Search League Statistics</h2>
             <select id="searchType" class="mb-4 p-2 border rounded">
                 <option value="ppg">Points Per Game</option>
-                <option value="highScore">Highest Score Ever</option>
-                <option value="lowScore">Lowest Score Ever</option>
+                <option value="record">Get Record</option>
                 <option value="matchups">Matchups Between Users</option>
                 <option value="trades">Trades Between Users</option>
-                <option value="winPercentage">Win Percentage</option>
-                <option value="longestWinStreak">Longest Win Streak</option>
-                <option value="highestScoringWeek">Highest Scoring Week</option>
+
             </select>
             <div id="userInputs" class="hidden mb-4">
                 <select id="user1" class="p-2 border rounded mr-2"></select>
@@ -74,6 +71,70 @@
                     `<option value="${user.user_id}">${user.display_name}</option>`
                 ).join('');
             });
+        }
+
+          async function getRecord(selectedYear) {
+            updateDebugInfo('Calculating records...');
+            const recordData = {};
+
+            try {
+                for (const league of leagueHistory) {
+                    if (selectedYear === 'all' || league.season === selectedYear) {
+                        updateDebugInfo(`Processing season ${league.season}...`);
+                        const rosters = await fetchData(`/league/${league.id}/rosters`);
+                        
+                        for (let week = 1; week <= 17; week++) {
+                            const weekMatchups = await fetchData(`/league/${league.id}/matchups/${week}`);
+                            const matchupPairs = {};
+
+                            weekMatchups.forEach(matchup => {
+                                if (!matchupPairs[matchup.matchup_id]) {
+                                    matchupPairs[matchup.matchup_id] = [];
+                                }
+                                matchupPairs[matchup.matchup_id].push(matchup);
+                            });
+
+                            Object.values(matchupPairs).forEach(pair => {
+                                if (pair.length === 2) {
+                                    const [team1, team2] = pair;
+                                    const user1Id = rosters.find(r => r.roster_id === team1.roster_id)?.owner_id;
+                                    const user2Id = rosters.find(r => r.roster_id === team2.roster_id)?.owner_id;
+
+                                    if (user1Id && user2Id) {
+                                        if (!recordData[user1Id]) recordData[user1Id] = { wins: 0, losses: 0, ties: 0 };
+                                        if (!recordData[user2Id]) recordData[user2Id] = { wins: 0, losses: 0, ties: 0 };
+
+                                        if (team1.points > team2.points) {
+                                            recordData[user1Id].wins++;
+                                            recordData[user2Id].losses++;
+                                        } else if (team2.points > team1.points) {
+                                            recordData[user2Id].wins++;
+                                            recordData[user1Id].losses++;
+                                        } else {
+                                            recordData[user1Id].ties++;
+                                            recordData[user2Id].ties++;
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+
+                const results = Object.entries(recordData).map(([userId, record]) => ({
+                    username: getUsernameById(userId),
+                    wins: record.wins,
+                    losses: record.losses,
+                    ties: record.ties,
+                    winPercentage: (record.wins / (record.wins + record.losses + record.ties) * 100).toFixed(2)
+                }));
+
+                updateDebugInfo('Records calculated successfully.');
+                return results.sort((a, b) => b.winPercentage - a.winPercentage);
+            } catch (error) {
+                updateDebugInfo(`Error calculating records: ${error.message}`);
+                throw error;
+            }
         }
 
         async function fetchPlayers() {
@@ -269,6 +330,16 @@
 
             try {
                 switch (searchType) {
+                         case 'record':
+                        const recordResults = await getRecord(selectedYear);
+                        results = recordResults.map(user => 
+                            `<li class="mb-2">
+                                ${user.username}: ${user.wins}-${user.losses}-${user.ties} 
+                                (Win %: ${user.winPercentage}%)
+                            </li>`
+                        ).join('');
+                        resultsDiv.innerHTML = `<ul class="list-disc pl-5">${results}</ul>`;
+                        break;
                          case 'ppg':
                         const ppgResults = await getPointsPerGame(selectedYear);
                         results = ppgResults.map(user => 
