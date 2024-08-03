@@ -611,8 +611,8 @@
                      results = `
         <h3 class="text-xl font-semibold mb-4">Head-to-head record: ${user1Name} ${user1Wins} - ${user2Wins} ${user2Name}</h3>
         ${matchups.map((m, index) => `
-            <div class="mb-2 p-4 bg-gray-100 rounded"> // Changed from bg-gray-700 to bg-gray-100
-                <div class="flex justify-between items-center cursor-pointer text-gray-800" onclick="toggleMatchupDetails(${index})"> // Added text-gray-800 for better contrast
+            <div class="mb-2 p-4 bg-gray-100 rounded">
+                <div class="flex justify-between items-center cursor-pointer text-gray-800" onclick="toggleMatchupDetails(${index})"> 
                     <span>${m.season} Season, Week ${m.week}: ${user1Name} ${m.user1Score.toFixed(2)} - ${m.user2Score.toFixed(2)} ${user2Name}</span>
                     <span class="text-xl" id="arrow-${index}">▼</span>
                 </div>
