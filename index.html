@@ -608,30 +608,30 @@
                     const { matchups, user1Wins, user2Wins } = matchupsData;
                     const user1Name = getUsernameById(user1Id);
                     const user2Name = getUsernameById(user2Id);
-                    results = `
-                        <h3 class="text-xl font-semibold mb-4">Head-to-head record: ${user1Name} ${user1Wins} - ${user2Wins} ${user2Name}</h3>
-                        ${matchups.map((m, index) => `
-                            <div class="mb-2 p-4 bg-gray-700 rounded">
-                                <div class="flex justify-between items-center cursor-pointer" onclick="toggleMatchupDetails(${index})">
-                                    <span>${m.season} Season, Week ${m.week}: ${user1Name} ${m.user1Score.toFixed(2)} - ${m.user2Score.toFixed(2)} ${user2Name}</span>
-                                    <span class="text-xl" id="arrow-${index}">▼</span>
-                                </div>
-                                <div class="matchup-details hidden mt-4" id="matchup-${index}">
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <h5 class="font-semibold mb-2">${user1Name}'s Roster:</h5>
-                                            ${formatRoster(m.user1Starters, m.user1Players, m.user1PlayerPoints)}
-                                        </div>
-                                        <div>
-                                            <h5 class="font-semibold mb-2">${user2Name}'s Roster:</h5>
-                                            ${formatRoster(m.user2Starters, m.user2Players, m.user2PlayerPoints)}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('')}
-                    `;
-                    break;
+                     results = `
+        <h3 class="text-xl font-semibold mb-4">Head-to-head record: ${user1Name} ${user1Wins} - ${user2Wins} ${user2Name}</h3>
+        ${matchups.map((m, index) => `
+            <div class="mb-2 p-4 bg-gray-100 rounded"> // Changed from bg-gray-700 to bg-gray-100
+                <div class="flex justify-between items-center cursor-pointer text-gray-800" onclick="toggleMatchupDetails(${index})"> // Added text-gray-800 for better contrast
+                    <span>${m.season} Season, Week ${m.week}: ${user1Name} ${m.user1Score.toFixed(2)} - ${m.user2Score.toFixed(2)} ${user2Name}</span>
+                    <span class="text-xl" id="arrow-${index}">▼</span>
+                </div>
+                <div class="matchup-details hidden mt-4" id="matchup-${index}">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <h5 class="font-semibold mb-2">${user1Name}'s Roster:</h5>
+                            ${formatRoster(m.user1Starters, m.user1Players, m.user1PlayerPoints)}
+                        </div>
+                        <div>
+                            <h5 class="font-semibold mb-2">${user2Name}'s Roster:</h5>
+                            ${formatRoster(m.user2Starters, m.user2Players, m.user2PlayerPoints)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('')}
+    `;
+    break;
                        case 'trades':
                     const tradeUser1Id = document.getElementById('user1').value;
                     const tradeUser2Id = document.getElementById('user2').value;
@@ -644,7 +644,7 @@
                         results = `
                             <h3 class="text-xl font-semibold mb-4">Trades between ${tradeUser1Name} and ${tradeUser2Name}</h3>
                             ${trades.map(trade => `
-                                <div class="mb-4 p-4 bg-gray-700 rounded">
+                                <div class="mb-4 p-4 bg-gray-100 rounded">
                                     <p class="font-semibold">${trade.season} Season, Week ${trade.week}</p>
                                     ${formatTradeDetails(trade, tradeUser1Name, tradeUser2Name)}
                                 </div>
